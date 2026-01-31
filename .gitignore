@@ -1,0 +1,7 @@
+
+## Archivos de ia
+*.pkl
+
+## Carpetas
+.venv/ 
+__pycache__/
