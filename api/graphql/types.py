@@ -99,3 +99,14 @@ class SemanticSearchResponse:
     answer: str
     products_found: list[ProductSummaryType]
     query: str
+    
+@strawberry.type
+class ProductImageType:
+    image_type: str
+    image_path: str
+
+@strawberry.type
+class ProductStockType:
+    ...
+    images: list[ProductImageType]
+
