@@ -7,6 +7,8 @@ Products and images are read from PostgreSQL database.
 
 from typing import Annotated
 from uuid import UUID
+from api.graphql.types import OCRInput, OCRResult
+from services.ocr_service import OCRService
 
 import strawberry
 from aioinject import Inject
@@ -138,6 +140,7 @@ class BusinessQuery:
                     notes=p.notes,
                     images=[
                         ProductImageType(
+                            id=img.id,
                             image_type=img.image_type,
                             image_path=img.image_path,
                         )
@@ -195,6 +198,7 @@ class BusinessQuery:
             notes=p.notes,
             images=[
                 ProductImageType(
+                    id=img.id,
                     image_type=img.image_type,
                     image_path=img.image_path,
                 )
@@ -264,3 +268,28 @@ class BusinessQuery:
             ],
             query=response.query,
         )
+        
+    # =====================
+    # OCR + Vision (MOCK)
+    # =====================
+
+    @strawberry.mutation
+    @inject
+    async def process_product_image(
+        self,
+        input: OCRInput,
+        ocr_service: Annotated[OCRService, Inject],
+    ) -> OCRResult:
+        """
+        Process product image with OCR + Vision.
+        """
+
+        logger.info(f"🧠 OCR processing image: {input.image_path}")
+
+        result = await ocr_service.process_image(
+            image_path=input.image_path,
+            raw_text=input.raw_text,
+        )
+
+        return result
+

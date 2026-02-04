@@ -76,6 +76,8 @@ class ProductStockType:
 
     notes: str | None
 
+    # 🔑 RELACIÓN
+    images: list["ProductImageType"]
 
 @strawberry.type
 class ProductSummaryType:
@@ -91,7 +93,6 @@ class ProductSummaryType:
     warehouse_location: str
     is_active: bool
 
-
 @strawberry.type
 class SemanticSearchResponse:
     """Response from semantic search with LLM."""
@@ -102,11 +103,36 @@ class SemanticSearchResponse:
     
 @strawberry.type
 class ProductImageType:
+    id: UUID
     image_type: str
     image_path: str
 
 @strawberry.type
-class ProductStockType:
-    ...
-    images: list[ProductImageType]
+class OCRDetectedData:
+    """Normalized data extracted from OCR + Vision."""
+
+    product_name: str | None
+    brand: str | None
+    presentation: str | None
+    weight_or_volume: str | None
+    batch_number: str | None
+    expiration_date: date | None
+    base_price: Decimal | None
+
+
+@strawberry.type
+class OCRResult:
+    """Final OCR result returned by backend."""
+
+    detected_data: OCRDetectedData
+    matched_product_id: str | None
+    confidence: float
+
+@strawberry.input
+class OCRInput:
+    """Input received from OCR agent."""
+
+    image_path: str
+    raw_text: str | None = None
+
 

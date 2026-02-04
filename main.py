@@ -22,6 +22,7 @@ from aioinject.ext.strawberry import AioInjectExtension
 from fastapi import FastAPI
 from loguru import logger
 from strawberry.fastapi import GraphQLRouter
+from fastapi.staticfiles import StaticFiles
 
 from api.graphql.queries import BusinessQuery
 from container import create_business_container
@@ -41,6 +42,12 @@ def create_business_backend_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+    
+    app.mount(
+    "/imagenes_productos",
+    StaticFiles(directory="imagenes_productos"),
+    name="imagenes_productos",
+)
 
     # Create business_backend's own DI container
     container = create_business_container()
@@ -86,6 +93,8 @@ def create_business_backend_app() -> FastAPI:
 
     logger.info("✅ Business Backend FastAPI app created")
     return app
+
+app = create_business_backend_app()
 
 
 if __name__ == "__main__":

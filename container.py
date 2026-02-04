@@ -14,6 +14,7 @@ The business_backend is responsible for:
 import functools
 from collections.abc import Iterable
 from typing import Any, Optional
+from services.ocr_service import OCRService
 
 import aioinject
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -24,6 +25,15 @@ from llm.provider import LLMProvider, create_llm_provider
 from services.product_service import ProductService
 from services.search_service import SearchService
 from services.tenant_data_service import TenantDataService
+
+async def create_ocr_service() -> OCRService:
+    """
+    Factory function for OCRService.
+
+    Returns:
+        OCRService instance
+    """
+    return OCRService()
 
 
 async def create_tenant_data_service() -> TenantDataService:
@@ -129,4 +139,9 @@ def create_business_container() -> aioinject.Container:
     container = aioinject.Container()
     for provider in providers():
         container.register(provider)
+        
+    container.register(
+        aioinject.Singleton(create_ocr_service)
+    )
+    
     return container

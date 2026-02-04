@@ -3,6 +3,7 @@ Product Service for Business Backend.
 
 Provides CRUD operations for ProductStock using SQLAlchemy ORM.
 """
+from database.models.product_image import ProductImage
 
 from uuid import UUID
 
@@ -137,3 +138,25 @@ class ProductService:
 
             result = await session.execute(query)
             return result.scalar_one()
+        
+    async def get_images_by_product_id(
+        self,
+        product_stock_id: UUID,
+    ) -> list[ProductImage]:
+        """
+        Get images associated with a product.
+
+        Args:
+            product_stock_id: UUID of ProductStock
+
+        Returns:
+            List of ProductImage instances
+        """
+        async with self.session_factory() as session:
+            query = select(ProductImage).where(
+                ProductImage.product_stock_id == product_stock_id
+            )
+
+            result = await session.execute(query)
+            return list(result.scalars().all())
+
