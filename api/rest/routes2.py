@@ -7,11 +7,14 @@ import cv2
 import mlflow
 import numpy as np
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+import traceback
 from fastapi.responses import JSONResponse
 from mlflow.entities import ViewType
 
+
 # este es el motor de reconocimiento de productos
 from ml.models.sift_engine import get_sift_engine
+from services.bgRemover import process_image_bytes
 
 router = APIRouter()
 
@@ -19,94 +22,154 @@ SIFT_STORAGE = "sift_data.pkl"
 
 sift_engine = get_sift_engine(str(SIFT_STORAGE))
 
+def find_optimal_threshold(cv_image, cv_mask, target_points=1500, tolerance=50):
+    """
+    Encuentra el threshold optimo para obtener ~target_points keypoints.
+    Retorna (best_threshold, best_vis_image, best_count).
+    """
+    low = 0.001
+    high = 0.2
+    best_vis = None
+    best_count = -1
+    best_th = 0.04
+    
+    for _ in range(8):
+        mid = (low + high) / 2
+        vis_img, count = sift_engine.detect_keypoints_vis(cv_image, mask=cv_mask, contrast_threshold=mid)
+        
+        if best_vis is None or abs(count - target_points) < abs(best_count - target_points):
+            best_vis = vis_img
+            best_count = count
+            best_th = mid
+        
+        if abs(count - target_points) <= tolerance:
+            break
+            
+        if count < target_points:
+            high = mid
+        else:
+            low = mid
+            
+    return best_th, best_vis, best_count
+
 
 @router.post('/register')
 async def register(
     image: UploadFile = File(...),
-    name: str = Form("Unknown"),
-    threshold: float = Form(0.04),
-    mask: Optional[UploadFile] = File(None)
+    name: str = Form("Unknown")
 ):
     """
     Registra un producto en la base de datos.
-    por ahora funciona con una sola imagen, hay que hacerlo para un grupo de imagenes bien armadas
-
+    Elimina automáticamente el fondo de la imagen usando bgRemover.
+    Calcula automáticamente el threshold para ~1500 keypoints.
+    
     Espera: 'image' file, 'name' text.
-    Opcional: 'mask' file (binary image), 'threshold' float.
     """
     try:
-        img_bytes = await image.read()
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        cv_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # 1. Leer imagen original
+        input_bytes = await image.read()
         
-        if cv_image is None:
-            return JSONResponse(status_code=400, content={'error': 'Invalid image'})
+        # 2. Remover fondo
+        processed_bytes = process_image_bytes(input_bytes)
+        
+        # Guardar imagen procesada para verificacion
+        # try:
+        #      os.makedirs("products_images", exist_ok=True)
+        #      safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '-', '_')]).strip().replace(' ', '_')
+        #      image_path = os.path.join("products_images", f"{safe_name}.png")
+        #      with open(image_path, "wb") as f:
+        #          f.write(processed_bytes)
+        #      print(f"Saved processed image to {image_path}")
+        # except Exception as e:
+        #      print(f"Failed to save image: {e}")
+        #      traceback.print_exc()
 
-        # Mask handling
-        cv_mask = None
-        if mask:
-            mask_bytes = await mask.read()
-            mask_nparr = np.frombuffer(mask_bytes, np.uint8)
-            cv_mask = cv2.imdecode(mask_nparr, cv2.IMREAD_GRAYSCALE)
-            
-            # Ensure mask is same size as image
-            if cv_mask is not None:
-                 cv_mask = cv2.resize(cv_mask, (cv_image.shape[1], cv_image.shape[0]))
-                 # Threshold just to be safe it's binary
-                 _, cv_mask = cv2.threshold(cv_mask, 127, 255, cv2.THRESH_BINARY)
+        # 3. Convertir a numpy/opencv
+        nparr = np.frombuffer(processed_bytes, np.uint8)
+        cv_image_rgba = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED) # Keep alpha
         
-        # Registrar con los parámetros
-        success, msg = sift_engine.register_product(name, cv_image, mask=cv_mask, contrast_threshold=threshold)
+        if cv_image_rgba is None:
+             return JSONResponse(status_code=400, content={'error': 'Could not process image'})
+             
+        # Separar canales: RGB para imagen, Alpha para máscara
+        if cv_image_rgba.shape[2] == 4:
+            cv_image = cv2.cvtColor(cv_image_rgba, cv2.COLOR_BGRA2BGR)
+            cv_mask = cv_image_rgba[:, :, 3] # Canal Alpha
+        else:
+            # Si por alguna razón no tiene alpha (rembg falló o devolvió RGB), usamos todo
+            cv_image = cv_image_rgba
+            cv_mask = None
+
+        # Threshold mask to be binary just in case
+        if cv_mask is not None:
+             _, cv_mask = cv2.threshold(cv_mask, 127, 255, cv2.THRESH_BINARY)
+        
+        # 4. Calcular mejor threshold
+        optimal_threshold, _, _ = find_optimal_threshold(cv_image, cv_mask)
+        print(f"Registering with optimal threshold: {optimal_threshold}")
+
+        # Registrar con los parámetros calculados
+        success, msg = sift_engine.register_product(name, cv_image, mask=cv_mask, contrast_threshold=optimal_threshold)
         
         if success:
-            return JSONResponse(status_code=200, content={'message': msg})
+            return JSONResponse(status_code=200, content={'message': msg, 'threshold': optimal_threshold})
         else:
             return JSONResponse(status_code=500, content={'error': msg})
 
     except Exception as e:
+        print("Error during registration:")
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
 @router.post('/preview_keypoints')
 async def preview_keypoints(
-    image: UploadFile = File(...),
-    threshold: float = Form(0.04),
-    mask: Optional[UploadFile] = File(None)
+    image: UploadFile = File(...)
 ):
     """
-    Previsualización de puntos clave, previo a guardar el producto.
-    Expects: 'image', 'mask' (opt), 'threshold' (opt).
+    Previsualización automática:
+    1. Removedor de fondo.
+    2. Ajuste automático de threshold para ~1500 keypoints.
     """
     try:
-        img_bytes = await image.read()
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        cv_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # 1. Leer imagen original
+        input_bytes = await image.read()
         
-        if cv_image is None:
-            return JSONResponse(status_code=400, content={'error': 'Invalid image'})
+        # 2. Remover fondo
+        processed_bytes = process_image_bytes(input_bytes)
+        
+        # 3. Convertir a numpy/opencv
+        nparr = np.frombuffer(processed_bytes, np.uint8)
+        cv_image_rgba = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+        
+        if cv_image_rgba is None:
+            return JSONResponse(status_code=400, content={'error': 'Could not process image'})
+            
+        if cv_image_rgba.shape[2] == 4:
+            cv_image = cv2.cvtColor(cv_image_rgba, cv2.COLOR_BGRA2BGR)
+            cv_mask = cv_image_rgba[:, :, 3]
+        else:
+            cv_image = cv_image_rgba
+            cv_mask = None
 
-        cv_mask = None
-        if mask:
-            mask_bytes = await mask.read()
-            mask_nparr = np.frombuffer(mask_bytes, np.uint8)
-            cv_mask = cv2.imdecode(mask_nparr, cv2.IMREAD_GRAYSCALE)
-            if cv_mask is not None:
-                 cv_mask = cv2.resize(cv_mask, (cv_image.shape[1], cv_image.shape[0]))
-                 _, cv_mask = cv2.threshold(cv_mask, 127, 255, cv2.THRESH_BINARY)
-
-        # Detect & Draw
-        vis_img, count = sift_engine.detect_keypoints_vis(cv_image, mask=cv_mask, contrast_threshold=threshold)
+        if cv_mask is not None:
+             _, cv_mask = cv2.threshold(cv_mask, 127, 255, cv2.THRESH_BINARY)
+             
+        # 4. Encontrar mejor threshold para target 1500 puntos
+        best_th, best_vis, best_count = find_optimal_threshold(cv_image, cv_mask)
         
         # Encode return
-        _, buffer = cv2.imencode('.jpg', vis_img)
+        _, buffer = cv2.imencode('.jpg', best_vis)
         vis_base64 = base64.b64encode(buffer).decode('utf-8')
         
-        #retorna la imagen con los puntos dibujados
         return {
             'keypoint_image': vis_base64,
-            'count': count
+            'count': best_count,
+            'optimized_threshold': round(best_th, 5)
         }
     except Exception as e:
+        print("Error during preview keypoints:")
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
