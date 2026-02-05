@@ -18,24 +18,12 @@ from typing import Any, Optional
 import aioinject
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from config import get_business_settings
 from database.session import get_session_factory
 from llm.provider import LLMProvider, create_llm_provider
 from services.product_service import ProductService
 from services.search_service import SearchService
-from services.tenant_data_service import TenantDataService
 
 
-async def create_tenant_data_service() -> TenantDataService:
-    """
-    Factory function for TenantDataService singleton.
-
-    TenantDataService has no dependencies - it only reads CSV files.
-
-    Returns:
-        TenantDataService instance
-    """
-    return TenantDataService()
 
 
 async def create_session_factory() -> async_sessionmaker[AsyncSession]:
@@ -101,9 +89,6 @@ def providers() -> Iterable[aioinject.Provider[Any]]:
     - SearchService: Semantic search with LLM
     """
     providers_list: list[aioinject.Provider[Any]] = []
-
-    # Core services (always available)
-    providers_list.append(aioinject.Singleton(create_tenant_data_service))
 
     # Database
     providers_list.append(aioinject.Singleton(create_session_factory))

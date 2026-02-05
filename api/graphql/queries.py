@@ -23,7 +23,6 @@ from api.graphql.types import (
 )
 from services.product_service import ProductService
 from services.search_service import SearchService
-from services.tenant_data_service import TenantDataService
 
 
 @strawberry.type
@@ -34,57 +33,57 @@ class BusinessQuery:
     # FAQs
     # =====================
 
-    @strawberry.field
-    @inject
-    async def get_faqs(
-        self, tenant: str, data_service: Annotated[TenantDataService, Inject]
-    ) -> list[FAQ]:
-        logger.info(f"📋 GraphQL: getFaqs(tenant={tenant})")
+    # @strawberry.field
+    # @inject
+    # async def get_faqs(
+    #     self, tenant: str, data_service: Annotated[TenantDataService, Inject]
+    # ) -> list[FAQ]:
+    #     logger.info(f"📋 GraphQL: getFaqs(tenant={tenant})")
 
-        try:
-            faq_data = await data_service.read_faqs_csv(tenant)
-        except FileNotFoundError:
-            return []
+    #     try:
+    #         faq_data = await data_service.read_faqs_csv(tenant)
+    #     except FileNotFoundError:
+    #         return []
 
-        faqs: list[FAQ] = []
+    #     faqs: list[FAQ] = []
 
-        for item in faq_data.faq_items:
-            faqs.append(
-                FAQ(
-                    type="faq",
-                    patterns=item.patterns,
-                    response=item.answer,
-                    category=item.category,
-                )
-            )
+    #     for item in faq_data.faq_items:
+    #         faqs.append(
+    #             FAQ(
+    #                 type="faq",
+    #                 patterns=item.patterns,
+    #                 response=item.answer,
+    #                 category=item.category,
+    #             )
+    #         )
 
-        return faqs
+    #     return faqs
 
     # =====================
     # Documents
     # =====================
 
-    @strawberry.field
-    @inject
-    async def get_documents(
-        self, tenant: str, data_service: Annotated[TenantDataService, Inject]
-    ) -> list[Document]:
-        logger.info(f"📚 GraphQL: getDocuments(tenant={tenant})")
+    # @strawberry.field
+    # @inject
+    # async def get_documents(
+    #     self, tenant: str, data_service: Annotated[TenantDataService, Inject]
+    # ) -> list[Document]:
+    #     logger.info(f"📚 GraphQL: getDocuments(tenant={tenant})")
 
-        try:
-            chunks = await data_service.read_chunks_csv(tenant)
-        except FileNotFoundError:
-            return []
+    #     try:
+    #         chunks = await data_service.read_chunks_csv(tenant)
+    #     except FileNotFoundError:
+    #         return []
 
-        return [
-            Document(
-                id=f"{tenant}_{idx}",
-                title=chunk.category or "Unknown",
-                content=chunk.content,
-                category=chunk.category or "general",
-            )
-            for idx, chunk in enumerate(chunks)
-        ]
+    #     return [
+    #         Document(
+    #             id=f"{tenant}_{idx}",
+    #             title=chunk.category or "Unknown",
+    #             content=chunk.content,
+    #             category=chunk.category or "general",
+    #         )
+    #         for idx, chunk in enumerate(chunks)
+    #     ]
 
     # =====================
     # Product Stock Queries
