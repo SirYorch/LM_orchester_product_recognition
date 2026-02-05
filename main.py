@@ -17,6 +17,7 @@ Usage:
 import argparse
 
 import strawberry
+
 import uvicorn
 from aioinject.ext.strawberry import AioInjectExtension
 from fastapi import FastAPI
