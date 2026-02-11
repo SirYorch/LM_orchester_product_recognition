@@ -316,10 +316,9 @@ async def chat(request: ChatRequest):
         
         # Formato de respuesta esperado por el frontend
         return {
-            "messages":
-                {
+            
                     "content": response_text,   
-                }
+                
             
         }
     except Exception as e:
