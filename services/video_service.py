@@ -2,6 +2,8 @@ import cv2
 import whisper
 from collections import defaultdict
 import os
+import csv
+import re
 
 # Global variable to cache the whisper model
 _whisper_model = None
@@ -278,3 +280,76 @@ def _annotate_text(segments, detections, min_words_text=4, min_presence_ratio=0.
         final_parts.append(text)
 
     return " ".join(final_parts)
+
+
+def annotate_text_with_csv(text, csv_path="products.csv", case_sensitive=False):
+    """
+    Anota un texto detectando nombres de productos del CSV y agregando su SKU-ID.
+    
+    Args:
+        text: Texto a anotar
+        csv_path: Ruta al archivo CSV con productos (por defecto: products.csv)
+        case_sensitive: Si True, la búsqueda es sensible a mayúsculas/minúsculas
+    
+    Returns:
+        Texto anotado con SKU-IDs
+        
+    Ejemplo:
+        Input: "Me gusta la Coca-Cola y la Pepsi"
+        Output: "Me gusta la Coca-Cola (SKU:550e8400-e29b-41d4-a716-446655440000) y la Pepsi (SKU:6ba7b810-9dad-11d1-80b4-00c04fd430c8)"
+    """
+    # Leer productos del CSV
+    products = []
+    if not os.path.exists(csv_path):
+        print(f"⚠️  CSV file not found: {csv_path}")
+        return text
+    
+    try:
+        with open(csv_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                products.append({
+                    'id': row['product_id'],
+                    'name': row['name']
+                })
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        return text
+    
+    if not products:
+        return text
+    
+    # Ordenar productos por longitud de nombre (más largo primero)
+    # Esto evita que nombres cortos reemplacen partes de nombres largos
+    products.sort(key=lambda p: len(p['name']), reverse=True)
+    
+    annotated_text = text
+    replacements = []  # Para evitar reemplazos duplicados
+    
+    for product in products:
+        product_name = product['name']
+        product_id = product['id']
+        
+        # Crear patrón de búsqueda
+        # \b asegura que coincida con palabras completas
+        if case_sensitive:
+            pattern = r'\b' + re.escape(product_name) + r'\b'
+            flags = 0
+        else:
+            pattern = r'\b' + re.escape(product_name) + r'\b'
+            flags = re.IGNORECASE
+        
+        # Buscar todas las ocurrencias
+        matches = list(re.finditer(pattern, annotated_text, flags=flags))
+        
+        # Reemplazar de atrás hacia adelante para mantener índices correctos
+        for match in reversed(matches):
+            start, end = match.span()
+            matched_text = annotated_text[start:end]
+            
+            # Verificar si ya fue anotado (evitar anotar dos veces)
+            if "(SKU:" not in annotated_text[end:end+50]:  # Buscar en los próximos 50 caracteres
+                replacement = f"{matched_text} (SKU:{product_id})"
+                annotated_text = annotated_text[:start] + replacement + annotated_text[end:]
+    
+    return annotated_text

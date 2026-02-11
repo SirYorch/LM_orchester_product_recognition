@@ -16,7 +16,7 @@ from mlflow.entities import ViewType
 # este es el motor de reconocimiento de productos
 from ml.models.sift_engine import get_sift_engine
 from services.bgRemover import process_image_bytes
-from services.video_service import process_video
+from services.video_service import process_video, annotate_text_with_csv
 
 router = APIRouter()
 
@@ -303,25 +303,34 @@ class ChatRequest(BaseModel):
 async def chat(request: ChatRequest):
     """
     Endpoint para recibir mensajes de texto y opcionalmente imágenes.
+    Detecta automáticamente nombres de productos en el texto y los anota con SKU-IDs.
     Retorna respuestas en formato de mensajes.
     """
     try:
         message = request.message
         image = request.image
         
-        # Aquí puedes procesar el mensaje y la imagen según tu lógica
-        # Por ahora, retornamos una respuesta simple
+        # Anotar el mensaje con SKU-IDs de productos detectados
+        annotated_message = annotate_text_with_csv(message, csv_path="products.csv")
         
-        response_text = f"Recibí tu mensaje: {message}"
+        # Verificar si se detectaron productos
+        products_detected = "(SKU:" in annotated_message
+        
+        if products_detected:
+            response_text = f"He detectado productos en tu mensaje:\n\n{annotated_message}"
+        else:
+            response_text = f"Mensaje recibido: {message}\n\nNo se detectaron productos registrados en el mensaje."
+        
+        # Si hay imagen, puedes procesarla aquí en el futuro
+        if image:
+            response_text += "\n\n(Imagen recibida - procesamiento pendiente)"
         
         # Formato de respuesta esperado por el frontend
         return {
-            
-                    "content": response_text,   
-                
-            
+            "content": response_text,   
         }
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={'error': str(e)})
+
 

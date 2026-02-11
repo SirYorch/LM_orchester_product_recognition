@@ -2,15 +2,18 @@ import cv2
 import numpy as np
 import joblib
 import os
+import csv
 from pathlib import Path
 
 class SIFTEngine:
-    def __init__(self, storage_path="sift_data.pkl"):
+    def __init__(self, storage_path="sift_data.pkl", csv_path="products.csv"):
         self.storage_path = storage_path
+        self.csv_path = csv_path
         self.sift = cv2.SIFT_create()
         # Storage format: { "product_id": {"name": "product_name", "descriptors": descriptors_array, "id": "product_id"} }
         self.database = {} 
         self.load_database()
+        self._ensure_csv_exists()
 
     def load_database(self):
         if os.path.exists(self.storage_path):
@@ -22,6 +25,36 @@ class SIFTEngine:
                 self.database = {}
         else:
             self.database = {}
+
+    def _ensure_csv_exists(self):
+        """Crea el archivo CSV si no existe, con encabezados."""
+        if not os.path.exists(self.csv_path):
+            with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['product_id', 'name'])
+            print(f"Created CSV file: {self.csv_path}")
+    
+    def _save_to_csv(self, product_id, name):
+        """Agrega o actualiza un producto en el CSV."""
+        # Leer productos existentes
+        existing_products = {}
+        if os.path.exists(self.csv_path):
+            with open(self.csv_path, 'r', newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    existing_products[row['product_id']] = row['name']
+        
+        # Actualizar o agregar nuevo producto
+        existing_products[product_id] = name
+        
+        # Escribir todos los productos de vuelta al CSV
+        with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['product_id', 'name'])
+            for pid, pname in existing_products.items():
+                writer.writerow([pid, pname])
+        
+        print(f"Updated CSV: {product_id} - {name}")
 
     def save_database(self):
         joblib.dump(self.database, self.storage_path)
@@ -65,6 +98,10 @@ class SIFTEngine:
             "descriptors": descriptors,
             "id": product_id
         }
+        
+        # Guardar en CSV
+        self._save_to_csv(product_id, name)
+        
         self.save_database()
         return True, f"Registered '{name}' (ID: {product_id}) with {len(keypoints)} features."
 
