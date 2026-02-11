@@ -271,15 +271,15 @@ def restore_version(request: RestoreRequest):
 
 
 @router.post('/analyze_video')
-async def analyze_video(file: UploadFile = File(...)):
+async def analyze_video(video: UploadFile = File(...)):
     """
     Sube un video, lo procesa para detectar productos y transcribir audio,
     y retorna el guion anotado.
     """
-    temp_file_path = f"temp_{file.filename}"
+    temp_file_path = f"temp_{video.filename}"
     try:
         with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            shutil.copyfileobj(video.file, buffer)
             
         # Process video
         # Note: process_video encapsulates the logic from videoIdent.py
