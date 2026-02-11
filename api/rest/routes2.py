@@ -1,6 +1,7 @@
 import base64
 import os
 import shutil
+import uuid
 from typing import List, Optional
 
 import cv2
@@ -109,11 +110,14 @@ async def register(
         optimal_threshold, _, _ = find_optimal_threshold(cv_image, cv_mask)
         print(f"Registering with optimal threshold: {optimal_threshold}")
 
+        # 5. Generar ID único para el producto
+        product_id = str(uuid.uuid4())
+
         # Registrar con los parámetros calculados
-        success, msg = sift_engine.register_product(name, cv_image, mask=cv_mask, contrast_threshold=optimal_threshold)
+        success, msg = sift_engine.register_product(name, product_id, cv_image, mask=cv_mask, contrast_threshold=optimal_threshold)
         
         if success:
-            return JSONResponse(status_code=200, content={'message': msg, 'threshold': optimal_threshold})
+            return JSONResponse(status_code=200, content={'message': msg, 'threshold': optimal_threshold, 'product_id': product_id})
         else:
             return JSONResponse(status_code=500, content={'error': msg})
 
@@ -187,17 +191,19 @@ async def predict(image: UploadFile = File(...)):
         if cv_image is None:
              return JSONResponse(status_code=400, content={'error': 'Invalid image'})
 
-        label, matches = sift_engine.identify_product(cv_image)  # identifica el producto
+        product_match, matches = sift_engine.identify_product(cv_image)  # identifica el producto
         
-        if label:
+        if product_match:
             return {
-                'label': label,
+                'label': product_match['name'],
+                'product_id': product_match['id'],
                 'matches': matches,
                 'probability': 1.0 # SIFT is deterministic "match found", simulated prob
             }
         else:
             return {
                 'label': 'Unknown',
+                'product_id': None,
                 'matches': matches,
                 'probability': 0.0
             }
@@ -286,4 +292,40 @@ async def analyze_video(video: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    image: Optional[str] = None  # Base64 encoded image or URL
+
+
+@router.post('/chat')
+async def chat(request: ChatRequest):
+    """
+    Endpoint para recibir mensajes de texto y opcionalmente imágenes.
+    Retorna respuestas en formato de mensajes.
+    """
+    try:
+        message = request.message
+        image = request.image
+        
+        # Aquí puedes procesar el mensaje y la imagen según tu lógica
+        # Por ahora, retornamos una respuesta simple
+        
+        response_text = f"Recibí tu mensaje: {message}"
+        
+        # Formato de respuesta esperado por el frontend
+        return {
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": response_text,
+                    "file": None,  # Aquí puedes agregar archivos si es necesario
+                    "messages": "Hola mundo"
+                }
+            ]
+        }
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={'error': str(e)})
 

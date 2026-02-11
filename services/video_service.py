@@ -112,7 +112,13 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
 
                 if des_q is not None:
                     # Accessing internal database of SIFT engine
-                    for sku, des_ref in sift_engine.database.items():
+                    for product_id, product_data in sift_engine.database.items():
+                        if product_data is None or product_data.get("descriptors") is None:
+                            continue
+                        
+                        des_ref = product_data["descriptors"]
+                        product_name = product_data["name"]
+                        
                         bf = cv2.BFMatcher()
                         matches = bf.knnMatch(des_ref, des_q, k=2)
 
@@ -125,7 +131,7 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
                                 good.append(m)
 
                         if len(good) >= min_matches:
-                            visible.append(sku)
+                            visible.append(product_name)
 
                 if visible:
                     detections.append({
@@ -175,7 +181,13 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
             kp_q, des_q = sift_engine.sift.detectAndCompute(gray, None)
 
             if des_q is not None:
-                for sku, des_ref in sift_engine.database.items():
+                for product_id, product_data in sift_engine.database.items():
+                    if product_data is None or product_data.get("descriptors") is None:
+                        continue
+                    
+                    des_ref = product_data["descriptors"]
+                    product_name = product_data["name"]
+                    
                     bf = cv2.BFMatcher()
                     matches = bf.knnMatch(des_ref, des_q, k=2)
 
@@ -188,7 +200,7 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
                             good.append(m)
 
                     if len(good) >= min_matches:
-                        visible.append(sku)
+                        visible.append(product_name)
 
             if visible:
                 detections.append({

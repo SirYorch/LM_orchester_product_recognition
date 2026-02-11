@@ -8,8 +8,7 @@ class SIFTEngine:
     def __init__(self, storage_path="sift_data.pkl"):
         self.storage_path = storage_path
         self.sift = cv2.SIFT_create()
-        # Storage format: { "product_name": [descriptors_1, descriptors_2, ...] }
-        # Or simpler: { "product_name": descriptors } if User implies 1 reference image implies 1 descriptor set
+        # Storage format: { "product_id": {"name": "product_name", "descriptors": descriptors_array, "id": "product_id"} }
         self.database = {} 
         self.load_database()
 
@@ -39,9 +38,11 @@ class SIFTEngine:
         except Exception as e:
             print(f"MLflow logging failed: {e}")
 
-    def register_product(self, name, image_bgr, mask=None, contrast_threshold=0.04, edge_threshold=10):
+    def register_product(self, name, product_id, image_bgr, mask=None, contrast_threshold=0.04, edge_threshold=10):
         """
         Compute features for reference image and store them.
+        name: Display name of the product
+        product_id: Unique identifier for the product
         contrast_threshold: The contrast threshold used to filter out weak features.
         edge_threshold: The threshold used to filter out edge-like features.
         """
@@ -59,9 +60,13 @@ class SIFTEngine:
         if descriptors is None:
             return False, "No features detected in image."
             
-        self.database[name] = descriptors
+        self.database[product_id] = {
+            "name": name,
+            "descriptors": descriptors,
+            "id": product_id
+        }
         self.save_database()
-        return True, f"Registered '{name}' with {len(keypoints)} features."
+        return True, f"Registered '{name}' (ID: {product_id}) with {len(keypoints)} features."
 
     def detect_keypoints_vis(self, image_bgr, mask=None, contrast_threshold=0.04, edge_threshold=10):
         """
@@ -80,7 +85,7 @@ class SIFTEngine:
     def identify_product(self, query_image_bgr, min_match_count=10):
         """
         Compare query image against all registered products.
-        Returns the best match label.
+        Returns dict with 'name', 'id', and match count, or None if no match.
         """
         gray_query = cv2.cvtColor(query_image_bgr, cv2.COLOR_BGR2GRAY)
         kp_q, des_q = self.sift.detectAndCompute(gray_query, None)
@@ -89,13 +94,15 @@ class SIFTEngine:
             return None, 0
 
         bf = cv2.BFMatcher()
-        best_label = None
+        best_match = None
         max_matches = 0
         
         # Iterate all products
-        for name, des_ref in self.database.items():
-            if des_ref is None: 
+        for product_id, product_data in self.database.items():
+            if product_data is None or product_data.get("descriptors") is None: 
                 continue
+            
+            des_ref = product_data["descriptors"]
                 
             # KNN Match
             matches = bf.knnMatch(des_ref, des_q, k=2)
@@ -108,10 +115,13 @@ class SIFTEngine:
             
             if len(good) > max_matches:
                 max_matches = len(good)
-                best_label = name
+                best_match = {
+                    "name": product_data["name"],
+                    "id": product_data["id"]
+                }
 
         if max_matches >= min_match_count:
-            return best_label, max_matches
+            return best_match, max_matches
         else:
             return None, max_matches
 
