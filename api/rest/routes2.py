@@ -316,14 +316,11 @@ async def chat(request: ChatRequest):
         
         # Formato de respuesta esperado por el frontend
         return {
-            "messages": [
+            "messages":
                 {
-                    "role": "assistant",
-                    "content": response_text,
-                    "file": None,  # Aquí puedes agregar archivos si es necesario
-                    "messages": "Hola mundo"
+                    "content": response_text,   
                 }
-            ]
+            
         }
     except Exception as e:
         traceback.print_exc()
