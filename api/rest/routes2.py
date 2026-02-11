@@ -15,6 +15,7 @@ from mlflow.entities import ViewType
 # este es el motor de reconocimiento de productos
 from ml.models.sift_engine import get_sift_engine
 from services.bgRemover import process_image_bytes
+from services.video_service import process_video
 
 router = APIRouter()
 
@@ -261,3 +262,28 @@ def restore_version(request: RestoreRequest):
         return {'message': f'Restored version {run_id}', 'count': len(sift_engine.database)}
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@router.post('/analyze_video')
+async def analyze_video(file: UploadFile = File(...)):
+    """
+    Sube un video, lo procesa para detectar productos y transcribir audio,
+    y retorna el guion anotado.
+    """
+    temp_file_path = f"temp_{file.filename}"
+    try:
+        with open(temp_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Process video
+        # Note: process_video encapsulates the logic from videoIdent.py
+        result_text = process_video(temp_file_path, sift_engine)
+        
+        return {"script": result_text}
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={'error': str(e)})
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+

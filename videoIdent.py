@@ -10,7 +10,7 @@ VIDEO_PATH = "video_test.mp4"
 SIFT_DB_PATH = "sift_data.pkl"
 
 FRAME_EVERY_SECONDS = 1
-MIN_MATCHES = 120
+MIN_MATCHES = 130
 
 WINDOW_SIZE = 1.0          # segundos
 MIN_FRAMES_PER_SKU = 5     # votos mínimos en la ventana
