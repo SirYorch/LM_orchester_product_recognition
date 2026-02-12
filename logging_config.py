@@ -22,27 +22,17 @@ class CustomFormatter(logging.Formatter):
 
 
 def configure_logging(level: int = logging.INFO) -> logging.Logger:
-    """
-    Configure logging for the application.
+    logging.basicConfig(level=level)
 
-    Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-
-    Returns:
-        Configured logger instance
-    """
-    logger = logging.getLogger("business_backend")
+    logger = logging.getLogger()
     logger.setLevel(level)
 
-    if logger.hasHandlers():
-        return logger
+    formatter = CustomFormatter()
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(level)
-
-    formatter = CustomFormatter()
     handler.setFormatter(formatter)
 
+    logger.handlers.clear()
     logger.addHandler(handler)
 
     return logger
