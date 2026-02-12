@@ -40,7 +40,7 @@ def create_business_backend_app() -> FastAPI:
     Returns:
         FastAPI application with GraphQL endpoint
     """
-    logger.info("Creating Business Backend FastAPI application")
+    print("Creating Business Backend FastAPI application")
     
     app = FastAPI(
         title="Business Backend API",
@@ -50,7 +50,7 @@ def create_business_backend_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    logger.info("Configuring CORS middleware")
+    print("Configuring CORS middleware")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -59,33 +59,33 @@ def create_business_backend_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    logger.info("Creating Business Backend DI container")
+    print("Creating Business Backend DI container")
     container = create_business_container()
-    logger.info("Business Backend DI container created successfully")
+    print("Business Backend DI container created successfully")
 
-    logger.info("Creating GraphQL schema")
+    print("Creating GraphQL schema")
     schema = strawberry.Schema(
         query=BusinessQuery,
         extensions=[
             AioInjectExtension(container),
         ],
     )
-    logger.info("Business Backend GraphQL schema created successfully")
+    print("Business Backend GraphQL schema created successfully")
 
-    logger.info("Registering GraphQL router")
+    print("Registering GraphQL router")
     graphql_app = GraphQLRouter(
         schema,
         graphiql=True,
     )
     app.include_router(graphql_app, prefix="/graphql")
 
-    logger.info("Registering product recognition router")
+    print("Registering product recognition router")
     app.include_router(product_router)
 
     @app.get("/health")
     async def health():
         """Health check for business backend service."""
-        logger.debug("Health check endpoint called")
+        print("Health check endpoint called")
         return {
             "status": "ok",
             "service": "business_backend",
@@ -95,7 +95,7 @@ def create_business_backend_app() -> FastAPI:
     @app.get("/")
     async def root():
         """Root endpoint with service information."""
-        logger.debug("Root endpoint called")
+        print("Root endpoint called")
         return {
             "service": "Business Backend API",
             "version": "1.0.0",
@@ -106,7 +106,7 @@ def create_business_backend_app() -> FastAPI:
             "docs": "/docs",
         }
 
-    logger.info("Business Backend FastAPI app created successfully")
+    print("Business Backend FastAPI app created successfully")
     return app
 
 
@@ -126,16 +126,16 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    logger.info("Command line arguments parsed successfully")
+    print("Command line arguments parsed successfully")
 
     app = create_business_backend_app()
 
     host: str = args.host
     port: int = args.port
 
-    logger.info(f"Starting Business Backend on {host}:{port}")
-    logger.info(f"GraphiQL UI available at http://localhost:{port}/graphql")
-    logger.info(f"API documentation available at http://localhost:{port}/docs")
+    print(f"Starting Business Backend on {host}:{port}")
+    print(f"GraphiQL UI available at http://localhost:{port}/graphql")
+    print(f"API documentation available at http://localhost:{port}/docs")
 
     uvicorn.run(
         app,

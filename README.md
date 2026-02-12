@@ -1,389 +1,93 @@
-# Business Backend
+# Backend de Reconocimiento de Productos y Análisis de Video
 
-FastAPI base project with PostgreSQL database, LLM integration, and ML capabilities.
+Este es un proyecto base en FastAPI que combina visión por computadora y transcripción de audio para gestionar y reconocer productos en videos.
 
-## Structure
+## Estructura
 
 ```
 business_backend/
-├── main.py                 # FastAPI app entry point
-├── container.py            # Dependency Injection (aioinject)
-│
-├── config/
-│   └── settings.py         # Pydantic BaseSettings (env vars)
-│
-├── database/
-│   ├── connection.py       # AsyncEngine (SQLAlchemy 2.0)
-│   ├── session.py          # Async session factory
-│   └── models/
-│       └── product_stock.py  # ORM models
-│
-├── llm/                    # [OPTIONAL] LLM integration
-│   ├── provider.py         # OpenAI via LangChain
-│   └── tools/
-│       └── product_search_tool.py  # LangChain tools
-│
-├── ml/                     # [OPTIONAL] Machine Learning
-│   ├── preprocessing/      # Data transformation
-│   │   ├── base.py         # BasePreprocessor (abstract)
-│   │   └── image_preprocessor.py
-│   ├── models/             # Model wrappers
-│   │   ├── base.py         # BaseModel (abstract)
-│   │   ├── registry.py     # Model registry (MLflow pattern)
-│   │   └── image_classifier.py
-│   ├── serving/            # Inference service
-│   │   └── inference_service.py
-│   └── training/           # Re-training
-│       ├── trainer.py      # Training logic
-│       └── experiment_tracker.py  # MLflow pattern
-│
+├── main.py                 # Punto de entrada de la aplicación FastAPI
 ├── services/
-│   ├── tenant_data_service.py  # CSV data (existing)
-│   ├── product_service.py      # DB CRUD operations
-│   └── search_service.py       # LLM orchestration
+│   ├── video_service.py    # Lógica central: SIFT + Whisper
+│   └── bgRemover.py        # Eliminación de fondo automática
 │
-├── api/graphql/
-│   ├── types.py            # Strawberry GraphQL types
-│   └── queries.py          # GraphQL queries
+├── api/rest/
+│   └── routes2.py          # Endpoints principales (REST)
 │
-└── domain/
-    └── product_schemas.py  # Pydantic schemas
+├── ml/
+│   ├── models/             
+│   │   └── sift_engine.py  # Motor de reconocimiento SIFT
+│
+├── sift_data.pkl           # Base de datos persistente de features (productos)
+├── products.csv            # Metadatos de productos (ID, Nombre)
+└── trans_whisper.py        # Módulo de prueba para transcripción
 ```
 
-## Environment Variables
+## Variables de Entorno
 
-```env
-# Database (required)
-PG_URL=postgresql+asyncpg://user:pass@localhost:5432/db_name
+El proyecto funciona principalmente de manera local, pero asegúrate de tener las siguientes dependencias del sistema:
 
-# LLM (optional)
-OPENAI_API_KEY=sk-...
-LLM_ENABLED=true   # Set to false to disable LLM
-```
+- **FFmpeg**: Requerido por `whisper` para procesar audio.
+  ```bash
+  sudo apt update && sudo apt install ffmpeg
+  ```
+- **OpenCV**: Requerido para el procesamiento de imágenes.
 
-## Run
+## Ejecución
+
+Para iniciar el servidor de desarrollo:
 
 ```bash
-poetry run python -m main --port 9000
+uvicorn main:app --reload --port 8000
 ```
 
-- GraphiQL UI: http://localhost:9000/graphql
-- API Docs: http://localhost:9000/docs
-- Health: http://localhost:9000/health
-
-## GraphQL Queries
-
-| Query | Description |
-|-------|-------------|
-| `getFaqs(tenant)` | Get FAQs from CSV |
-| `getDocuments(tenant)` | Get documents from CSV |
-| `products(limit, offset)` | List products from DB |
-| `product(id)` | Get product by UUID |
-| `searchProducts(name)` | Search products by name |
-| `semanticSearch(query)` | LLM-powered search |
-
-### Examples
-
-```graphql
-# List products
-query {
-  products(limit: 10) {
-    productName
-    quantityAvailable
-    stockStatus
-  }
-}
-
-# Semantic search
-query {
-  semanticSearch(query: "Do you have milk in stock?") {
-    answer
-    productsFound {
-      productName
-      quantityAvailable
-    }
-  }
-}
-```
-
-## Adding New Services
-
-### 1. Create Service
-
-```python
-# services/my_service.py
-class MyService:
-    def __init__(self, session_factory):
-        self.session_factory = session_factory
-
-    async def my_method(self):
-        async with self.session_factory() as session:
-            # SQLAlchemy ORM queries here
-            pass
-```
-
-### 2. Register in Container
-
-```python
-# container.py
-from services.my_service import MyService
-
-async def create_my_service(session_factory) -> MyService:
-    return MyService(session_factory)
-
-def providers():
-    # ... existing providers
-    providers_list.append(aioinject.Singleton(create_my_service))
-```
-
-### 3. Add GraphQL Query
-
-```python
-# api/graphql/queries.py
-@strawberry.field
-@inject
-async def my_query(
-    self,
-    my_service: Annotated[MyService, Inject],
-) -> MyType:
-    return await my_service.my_method()
-```
-
-## Adding New Models
-
-### 1. Create SQLAlchemy Model
-
-```python
-# database/models/my_model.py
-from sqlalchemy.orm import Mapped, mapped_column
-from database.models.product_stock import Base
-
-class MyModel(Base):
-    __tablename__ = "my_table"
-    __table_args__ = {"schema": "public"}
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(255))
-```
-
-### 2. Export in `__init__.py`
-
-```python
-# database/models/__init__.py
-from database.models.my_model import MyModel
-```
-
-## Removing LLM Module
-
-To remove LLM functionality:
-
-### Option 1: Disable via Environment
-
-```env
-LLM_ENABLED=false
-```
-
-The `semanticSearch` query will use fallback (direct DB search).
-
-### Option 2: Remove Completely
-
-1. Delete `llm/` directory
-2. Delete `services/search_service.py`
-3. Update `container.py`:
-
-```python
-# Remove these lines:
-from llm.provider import LLMProvider, create_llm_provider
-from services.search_service import SearchService
-
-# Remove these providers:
-# providers_list.append(aioinject.Singleton(create_llm_provider_instance))
-# providers_list.append(aioinject.Singleton(create_search_service))
-```
-
-4. Update `api/graphql/queries.py`:
-   - Remove `SearchService` import
-   - Remove `semantic_search` query
-
-## Adding LangChain Tools
-
-```python
-# llm/tools/my_tool.py
-from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field
-
-class MyToolInput(BaseModel):
-    param: str = Field(description="Description for LLM")
-
-class MyTool(BaseTool):
-    name: str = "my_tool"
-    description: str = "What this tool does (for LLM)"
-    args_schema: type[BaseModel] = MyToolInput
-
-    async def _arun(self, param: str) -> str:
-        # Tool logic here
-        return "result"
-```
-
-Then bind in `search_service.py`:
-
-```python
-model_with_tools = self.llm_provider.bind_tools([
-    self.search_tool,
-    my_new_tool,  # Add here
-])
-```
-
-## Architecture
-
-```
-Request → GraphQL → Service → Database (SQLAlchemy ORM)
-                         ↓
-                   LLM Provider → LangChain Tools → Service
-                         ↓
-                   ML Module → Inference/Training → Models
-```
-
-- **Dependency Injection**: aioinject container
-- **Database**: SQLAlchemy 2.0 async with PostgreSQL
-- **GraphQL**: Strawberry with aioinject extension
-- **LLM**: LangChain with OpenAI (tool calling)
-- **ML**: Preprocessing, serving, training (optional)
-
----
-
-## Machine Learning Module
-
-The `ml/` module provides ML capabilities for preprocessing, inference, and training.
-
-### ML Structure
-
-| Module | Purpose |
-|--------|---------|
-| `preprocessing/` | Transform raw data to model input |
-| `models/` | Model wrappers and registry |
-| `serving/` | Inference service |
-| `training/` | Re-training and experiment tracking |
-
-### ML Inference Flow
-
-```
-1. Register model in registry
-2. InferenceService.predict(model_name, data)
-   └─→ Registry.load(model_name)
-       └─→ Model.predict(preprocessed_data)
-           └─→ PredictionResult
-```
-
-### ML Training Flow
-
-```
-1. Create Trainer with ExperimentTracker
-2. Trainer.train(model, dataset, config)
-   └─→ ExperimentTracker.start_run()
-       └─→ Training loop (log metrics per epoch)
-           └─→ save_checkpoint()
-               └─→ ExperimentTracker.end_run()
-```
-
-### Adding a New ML Model
-
-#### 1. Create Model Class
-
-```python
-# ml/models/my_model.py
-from ml.models.base import BaseModel
-
-class MyModel(BaseModel):
-    model_type: str = "image"  # or "text", "tabular"
-    input_shape: tuple = (224, 224, 3)
-
-    async def load(self, path):
-        # Here your code for loading model
-        pass
-
-    async def predict(self, data):
-        # Here your code for inference
-        return {"prediction": result, "confidence": 0.95}
-```
-
-#### 2. Create Preprocessor (if needed)
-
-```python
-# ml/preprocessing/my_preprocessor.py
-from ml.preprocessing.base import BasePreprocessor
-
-class MyPreprocessor(BasePreprocessor):
-    async def process(self, data):
-        # Here your code for preprocessing
-        pass
-
-    async def process_batch(self, data_list):
-        # Here your code for batch preprocessing
-        pass
-
-    def validate(self, data):
-        # Here your code for validation
-        pass
-```
-
-#### 3. Register and Use
-
-```python
-from ml.models.registry import ModelRegistry, ModelStage
-from ml.models.my_model import MyModel
-from ml.serving.inference_service import InferenceService
-
-# Register
-registry = ModelRegistry()
-registry.register(
-    name="my_model",
-    model_class=MyModel,
-    model_path="path/to/weights.h5",
-    stage=ModelStage.PRODUCTION,
-)
-
-# Inference
-service = InferenceService(registry)
-result = await service.predict("my_model", input_data)
-```
-
-### Training a Model
-
-```python
-from ml.training.trainer import Trainer, TrainConfig
-from ml.training.experiment_tracker import ExperimentTracker
-
-# Setup
-tracker = ExperimentTracker(artifact_location="./experiments")
-trainer = Trainer(experiment_tracker=tracker)
-
-# Configure
-config = TrainConfig(
-    epochs=50,
-    batch_size=32,
-    learning_rate=0.001,
-    early_stopping=True,
-)
-
-# Train
-result = await trainer.train(
-    model=my_model,
-    train_data=train_dataset,
-    config=config,
-    validation_data=val_dataset,
-)
-
-# Evaluate
-eval_result = await trainer.evaluate(my_model, test_dataset)
-```
-
-### Removing ML Module
-
-To remove ML functionality completely:
-
-1. Delete `ml/` directory
-2. Remove ML imports from `container.py` (if any)
-3. Remove ML GraphQL queries (if any)
-
-The module is self-contained and has no dependencies on other modules.
+- API Docs (Swagger): http://localhost:8000/docs
+- Health: http://localhost:8000/health
+
+## Endpoints (API REST)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `POST` | `/register` | Registra un nuevo producto. Sube imagen + nombre. Elimina fondo automáticamente. |
+| `POST` | `/analyze_video` | Sube un video para obtener una transcripción enriquecida con detección de productos. |
+| `POST` | `/chat` | Envía texto/imagen. Detecta productos mencionados y anota sus SKUs. |
+| `POST` | `/preview_keypoints` | Previsualiza cuántos puntos clave SIFT se detectan en una imagen. |
+| `GET` | `/mlflow/versions` | Lista las versiones guardadas de la base de datos de productos. |
+| `POST` | `/mlflow/restore` | Restaura una versión anterior de la base de datos de productos. |
+
+### Ejemplos de Uso
+
+#### 1. Registrar un Producto
+Sube una imagen del producto (e.g., una botella de refresco). El sistema:
+1. Elimina el fondo.
+2. Calcula automáticamente el contraste óptimo para extraer ~1500 puntos clave (SIFT).
+3. Guarda los descriptores en `sift_data.pkl`.
+4. Retorna el ID generado (`UUID`).
+
+#### 2. Analizar Video
+Sube un video MP4 donde aparezcan productos y se hable de ellos.
+- **Visión**: Detecta productos frame a frame mediante coincidencia de puntos clave (SIFT).
+- **Audio**: Transcribe el audio a texto usando el modelo `base` de Whisper.
+- **Resultado**: Un guion de texto donde las menciones a productos están anotadas con sus SKUs si fueron vistos o mencionados.
+
+## Funcionamiento de los Módulos
+
+### Módulo de Visión (SIFT Engine)
+Utiliza el algoritmo **SIFT (Scale-Invariant Feature Transform)** para ser robusto a cambios de escala y rotación.
+- Al registrar, se extraen descriptores de la imagen "ideal".
+- Al analizar video, se comparan los descriptores de cada frame con la base de datos usando `BFMatcher` (Brute Force Matcher) con ratio test de Lowe.
+
+### Módulo de Audio (Whisper)
+Utiliza el modelo **Whisper de OpenAI** (versión `base` local) para convertir voz a texto.
+- Soporta múltiples idiomas, pero está configurado principalmente para español (`language="es"`).
+- Segmenta el audio y alinea las transcripciones con los timestamps del video.
+
+### Módulo de Anotación (`/chat`, Video)
+Cruza la información de texto y visión.
+- Si el texto menciona "Coca-Cola" y el sistema visual detectó una Coca-Cola en ese segundo, la transcripción final dirá: "Coca-Cola (SKU: 1234-...)".
+- Utiliza `products.csv` como fuente de verdad para nombres de productos y sus IDs.
+
+## MLflow (Versionado)
+El sistema rastrea cada vez que se actualiza la base de datos de productos (`sift_data.pkl`).
+- Permite listar versiones históricas.
+- Permite "viajar en el tiempo" y restaurar un estado anterior de la base de conocimiento de productos si algo sale mal.

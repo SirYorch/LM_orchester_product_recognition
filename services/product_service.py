@@ -26,9 +26,9 @@ class ProductService:
         Args:
             session_factory: Async session factory for database operations
         """
-        logger.debug("Initializing ProductService")
+        print("Initializing ProductService")
         self.session_factory = session_factory
-        logger.debug("ProductService initialized successfully")
+        print("ProductService initialized successfully")
 
     async def list_products(
         self,
@@ -47,7 +47,7 @@ class ProductService:
         Returns:
             List of ProductStock instances
         """
-        logger.debug(f"Listing products with limit={limit}, offset={offset}, active_only={active_only}")
+        print(f"Listing products with limit={limit}, offset={offset}, active_only={active_only}")
         try:
             async with self.session_factory() as session:
                 query = select(ProductStock)
@@ -59,10 +59,10 @@ class ProductService:
 
                 result = await session.execute(query)
                 products = list(result.scalars().all())
-                logger.info(f"Retrieved {len(products)} products")
+                print(f"Retrieved {len(products)} products")
                 return products
         except Exception as e:
-            logger.error(f"Error listing products: {str(e)}")
+            print(f"Error listing products: {str(e)}")
             raise
 
     async def get_product(self, product_id: UUID) -> ProductStock | None:
@@ -75,19 +75,19 @@ class ProductService:
         Returns:
             ProductStock instance or None if not found
         """
-        logger.debug(f"Retrieving product with ID: {product_id}")
+        print(f"Retrieving product with ID: {product_id}")
         try:
             async with self.session_factory() as session:
                 query = select(ProductStock).where(ProductStock.id == product_id)
                 result = await session.execute(query)
                 product = result.scalar_one_or_none()
                 if product:
-                    logger.info(f"Product found: {product.product_name}")
+                    print(f"Product found: {product.product_name}")
                 else:
-                    logger.warning(f"Product not found with ID: {product_id}")
+                    print(f"Product not found with ID: {product_id}")
                 return product
         except Exception as e:
-            logger.error(f"Error retrieving product {product_id}: {str(e)}")
+            print(f"Error retrieving product {product_id}: {str(e)}")
             raise
 
     async def search_by_name(
@@ -107,7 +107,7 @@ class ProductService:
         Returns:
             List of matching ProductStock instances
         """
-        logger.debug(f"Searching products by name: '{name}', limit={limit}")
+        print(f"Searching products by name: '{name}', limit={limit}")
         try:
             async with self.session_factory() as session:
                 query = select(ProductStock).where(
@@ -121,10 +121,10 @@ class ProductService:
 
                 result = await session.execute(query)
                 products = list(result.scalars().all())
-                logger.info(f"Found {len(products)} products matching '{name}'")
+                print(f"Found {len(products)} products matching '{name}'")
                 return products
         except Exception as e:
-            logger.error(f"Error searching products by name '{name}': {str(e)}")
+            print(f"Error searching products by name '{name}': {str(e)}")
             raise
 
     async def get_low_stock_products(self, limit: int = 50) -> list[ProductStock]:
@@ -137,7 +137,7 @@ class ProductService:
         Returns:
             List of ProductStock instances with low stock
         """
-        logger.debug(f"Retrieving low stock products, limit={limit}")
+        print(f"Retrieving low stock products, limit={limit}")
         try:
             async with self.session_factory() as session:
                 query = (
@@ -150,10 +150,10 @@ class ProductService:
 
                 result = await session.execute(query)
                 products = list(result.scalars().all())
-                logger.info(f"Found {len(products)} products with low stock")
+                print(f"Found {len(products)} products with low stock")
                 return products
         except Exception as e:
-            logger.error(f"Error retrieving low stock products: {str(e)}")
+            print(f"Error retrieving low stock products: {str(e)}")
             raise
 
     async def count_products(self, active_only: bool = True) -> int:
@@ -166,7 +166,7 @@ class ProductService:
         Returns:
             Total count of products
         """
-        logger.debug(f"Counting products, active_only={active_only}")
+        print(f"Counting products, active_only={active_only}")
         try:
             async with self.session_factory() as session:
                 query = select(func.count(ProductStock.id))
@@ -176,8 +176,8 @@ class ProductService:
 
                 result = await session.execute(query)
                 count = result.scalar_one()
-                logger.info(f"Total products count: {count}")
+                print(f"Total products count: {count}")
                 return count
         except Exception as e:
-            logger.error(f"Error counting products: {str(e)}")
+            print(f"Error counting products: {str(e)}")
             raise

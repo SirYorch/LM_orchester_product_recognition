@@ -23,7 +23,7 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     Returns:
         async_sessionmaker configured for the engine
     """
-    logger.debug("Creating async session factory")
+    print("Creating async session factory")
     engine = get_engine()
     factory = async_sessionmaker(
         bind=engine,
@@ -31,7 +31,7 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
         expire_on_commit=False,
         autoflush=False,
     )
-    logger.debug("Async session factory created successfully")
+    print("Async session factory created successfully")
     return factory
 
 
@@ -47,17 +47,17 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     Yields:
         AsyncSession instance
     """
-    logger.debug("Creating new database session")
+    print("Creating new database session")
     factory = get_session_factory()
     async with factory() as session:
         try:
-            logger.debug("Database session opened")
+            print("Database session opened")
             yield session
-            logger.debug("Committing database transaction")
+            print("Committing database transaction")
             await session.commit()
-            logger.debug("Database transaction committed successfully")
+            print("Database transaction committed successfully")
         except Exception as e:
-            logger.error(f"Database error occurred: {str(e)}")
-            logger.debug("Rolling back database transaction")
+            print(f"Database error occurred: {str(e)}")
+            print("Rolling back database transaction")
             await session.rollback()
             raise

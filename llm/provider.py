@@ -24,9 +24,9 @@ class LLMProvider:
         Args:
             model: LangChain chat model instance
         """
-        logger.debug("Initializing LLMProvider")
+        print("Initializing LLMProvider")
         self.model = model
-        logger.info("LLMProvider initialized successfully")
+        print("LLMProvider initialized successfully")
 
     def get_model(self) -> BaseChatModel:
         """Get the underlying LangChain model."""
@@ -42,9 +42,9 @@ class LLMProvider:
         Returns:
             Model with tools bound
         """
-        logger.debug(f"Binding {len(tools)} tool(s) to model")
+        print(f"Binding {len(tools)} tool(s) to model")
         model_with_tools = self.model.bind_tools(tools)
-        logger.info(f"Successfully bound {len(tools)} tool(s) to model")
+        print(f"Successfully bound {len(tools)} tool(s) to model")
         return model_with_tools
 
 
@@ -55,18 +55,18 @@ def create_llm_provider() -> LLMProvider | None:
     Returns:
         LLMProvider instance or None if disabled/not configured
     """
-    logger.debug("Creating LLM provider from settings")
+    print("Creating LLM provider from settings")
     settings = get_business_settings()
 
     if not settings.llm_enabled:
-        logger.warning("LLM is disabled in settings")
+        print("LLM is disabled in settings")
         return None
 
     if not settings.openai_api_key:
-        logger.warning("OpenAI API key not configured")
+        print("OpenAI API key not configured")
         return None
 
-    logger.info(f"Creating ChatOpenAI model: {settings.openai_model}")
+    print(f"Creating ChatOpenAI model: {settings.openai_model}")
     model = ChatOpenAI(
         api_key=settings.openai_api_key,
         model=settings.openai_model,
@@ -75,5 +75,5 @@ def create_llm_provider() -> LLMProvider | None:
     )
 
     provider = LLMProvider(model)
-    logger.info("LLM provider created successfully")
+    print("LLM provider created successfully")
     return provider

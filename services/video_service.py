@@ -33,6 +33,7 @@ def process_video(video_path, sift_engine, frame_every_seconds=1, min_matches=13
     print("Transcribing audio...")
     model = get_whisper_model()
     result = model.transcribe(video_path, language="es")
+    print("Transcription completed. Segments:", len(result["segments"]))
     
     segments = [
         {
@@ -120,7 +121,6 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
                         
                         des_ref = product_data["descriptors"]
                         product_name = product_data["name"]
-                        
                         bf = cv2.BFMatcher()
                         matches = bf.knnMatch(des_ref, des_q, k=2)
 
@@ -189,10 +189,12 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
                     
                     des_ref = product_data["descriptors"]
                     product_name = product_data["name"]
+
+                    
+                    
                     
                     bf = cv2.BFMatcher()
                     matches = bf.knnMatch(des_ref, des_q, k=2)
-
                     good = []
                     for pair in matches:
                         if len(pair) < 2:
@@ -203,6 +205,7 @@ def _detect_products_in_video(video_path, sift_engine, frame_every_seconds, min_
 
                     if len(good) >= min_matches:
                         visible.append(product_name)
+                        # print(f"Producto detectado: {product_name} con {len(good)} buenos matches")
 
             if visible:
                 detections.append({

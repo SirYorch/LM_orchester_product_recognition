@@ -26,13 +26,13 @@ def create_async_engine(database_url: str) -> AsyncEngine:
     Returns:
         AsyncEngine instance
     """
-    logger.info("Creating async SQLAlchemy engine")
+    print("Creating async SQLAlchemy engine")
     engine = sa_create_async_engine(  
         database_url,
         poolclass=NullPool,
         echo=False,
     )
-    logger.debug(f"Async engine created for URL: {str(database_url)[:50]}...")
+    print(f"Async engine created for URL: {str(database_url)[:50]}...")
     return engine
 
 
@@ -44,9 +44,9 @@ def get_engine() -> AsyncEngine:
     Returns:
         Cached AsyncEngine instance
     """
-    logger.info("Retrieving cached async engine")
+    print("Retrieving cached async engine")
     settings = get_business_settings()
-    logger.debug("Creating engine from settings")
+    print("Creating engine from settings")
     engine = create_async_engine(str(settings.pg_url))
-    logger.info("Cached async engine retrieved successfully")
+    print("Cached async engine retrieved successfully")
     return engine

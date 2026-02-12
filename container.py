@@ -37,9 +37,9 @@ async def create_session_factory() -> async_sessionmaker[AsyncSession]:
     Returns:
         async_sessionmaker for creating database sessions
     """
-    logger.debug("Creating database session factory")
+    print("Creating database session factory")
     factory = get_session_factory()
-    logger.info("Database session factory created successfully")
+    print("Database session factory created successfully")
     return factory
 
 
@@ -55,9 +55,9 @@ async def create_product_service(
     Returns:
         ProductService instance
     """
-    logger.debug("Creating ProductService instance")
+    print("Creating ProductService instance")
     service = ProductService(session_factory)
-    logger.info("ProductService instance created successfully")
+    print("ProductService instance created successfully")
     return service
 
 
@@ -68,12 +68,12 @@ async def create_llm_provider_instance() -> LLMProvider:
     Returns:
         LLMProvider instance or None if disabled
     """
-    logger.debug("Creating LLM provider instance")
+    print("Creating LLM provider instance")
     provider = create_llm_provider()
     if provider:
-        logger.info("LLM provider instance created successfully")
+        print("LLM provider instance created successfully")
     else:
-        logger.warning("LLM provider is disabled or not configured")
+        print("LLM provider is disabled or not configured")
     return provider
 
 
@@ -91,9 +91,9 @@ async def create_search_service(
     Returns:
         SearchService instance
     """
-    logger.debug("Creating SearchService instance")
+    print("Creating SearchService instance")
     service = SearchService(llm_provider, product_service)
-    logger.info("SearchService instance created successfully")
+    print("SearchService instance created successfully")
     return service
 
 
@@ -107,18 +107,18 @@ def providers() -> Iterable[aioinject.Provider[Any]]:
     - LLMProvider: OpenAI via LangChain (optional)
     - SearchService: Semantic search with LLM
     """
-    logger.debug("Creating dependency injection providers")
+    print("Creating dependency injection providers")
     providers_list: list[aioinject.Provider[Any]] = []
 
-    logger.debug("Registering database providers")
+    print("Registering database providers")
     providers_list.append(aioinject.Singleton(create_session_factory))
     providers_list.append(aioinject.Singleton(create_product_service))
 
-    logger.debug("Registering LLM and search providers")
+    print("Registering LLM and search providers")
     providers_list.append(aioinject.Singleton(create_llm_provider_instance))
     providers_list.append(aioinject.Singleton(create_search_service))
 
-    logger.info(f"Dependency injection providers created successfully - total: {len(providers_list)}")
+    print(f"Dependency injection providers created successfully - total: {len(providers_list)}")
     return providers_list
 
 
@@ -132,13 +132,13 @@ def create_business_container() -> aioinject.Container:
     Returns:
         Configured aioinject.Container instance
     """
-    logger.info("Creating business backend dependency injection container")
+    print("Creating business backend dependency injection container")
     container = aioinject.Container()
     
-    logger.debug("Registering providers in container")
+    print("Registering providers in container")
     for idx, provider in enumerate(providers(), 1):
         container.register(provider)
-        logger.debug(f"Registered provider {idx}")
+        print(f"Registered provider {idx}")
     
-    logger.info("Business backend container created and configured successfully")
+    print("Business backend container created and configured successfully")
     return container

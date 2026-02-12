@@ -38,7 +38,7 @@ class BusinessQuery:
     # async def get_faqs(
     #     self, tenant: str, data_service: Annotated[TenantDataService, Inject]
     # ) -> list[FAQ]:
-    #     logger.info(f"📋 GraphQL: getFaqs(tenant={tenant})")
+    #     print(f"📋 GraphQL: getFaqs(tenant={tenant})")
 
     #     try:
     #         faq_data = await data_service.read_faqs_csv(tenant)
@@ -68,7 +68,7 @@ class BusinessQuery:
     # async def get_documents(
     #     self, tenant: str, data_service: Annotated[TenantDataService, Inject]
     # ) -> list[Document]:
-    #     logger.info(f"📚 GraphQL: getDocuments(tenant={tenant})")
+    #     print(f"📚 GraphQL: getDocuments(tenant={tenant})")
 
     #     try:
     #         chunks = await data_service.read_chunks_csv(tenant)
@@ -97,7 +97,7 @@ class BusinessQuery:
         limit: int = 50,
         offset: int = 0,
     ) -> list[ProductStockType]:
-        logger.info(f"📦 GraphQL: products(limit={limit}, offset={offset})")
+        print(f"📦 GraphQL: products(limit={limit}, offset={offset})")
 
         products = await product_service.list_products(limit=limit, offset=offset)
 
@@ -145,7 +145,7 @@ class BusinessQuery:
                 )
             )
 
-        logger.info(f"✅ GraphQL: Returned {len(result)} products")
+        print(f"✅ GraphQL: Returned {len(result)} products")
         return result
 
     @strawberry.field
@@ -155,7 +155,7 @@ class BusinessQuery:
         product_service: Annotated[ProductService, Inject],
         id: UUID,
     ) -> ProductStockType | None:
-        logger.info(f"📦 GraphQL: product(id={id})")
+        print(f"📦 GraphQL: product(id={id})")
 
         p = await product_service.get_product(id)
 
@@ -213,7 +213,7 @@ class BusinessQuery:
         name: str,
         limit: int = 20,
     ) -> list[ProductSummaryType]:
-        logger.info(f"🔍 GraphQL: searchProducts(name={name})")
+        print(f"🔍 GraphQL: searchProducts(name={name})")
 
         products = await product_service.search_by_name(name=name, limit=limit)
 

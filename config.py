@@ -48,7 +48,7 @@ def get_business_settings() -> BusinessSettings:
     Returns:
         BusinessSettings: Configured settings object
     """
-    logger.debug("Loading business settings from environment")
+    print("Loading business settings from environment")
     settings = BusinessSettings()
-    logger.info(f"Business settings loaded - Host: {settings.host}, Port: {settings.port}, Debug: {settings.debug}")
+    print(f"Business settings loaded - Host: {settings.host}, Port: {settings.port}, Debug: {settings.debug}")
     return settings
