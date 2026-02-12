@@ -5,11 +5,15 @@ Single-tenant async engine using SQLAlchemy 2.0.
 """
 
 import functools
+import logging
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine as sa_create_async_engine
 from sqlalchemy.pool import NullPool
 
 from config import get_business_settings
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def create_async_engine(database_url: str) -> AsyncEngine:
@@ -22,11 +26,14 @@ def create_async_engine(database_url: str) -> AsyncEngine:
     Returns:
         AsyncEngine instance
     """
-    return sa_create_async_engine(  
+    logger.info("Creating async SQLAlchemy engine")
+    engine = sa_create_async_engine(  
         database_url,
-        poolclass=NullPool,  # Recommended for async
+        poolclass=NullPool,
         echo=False,
     )
+    logger.debug(f"Async engine created for URL: {str(database_url)[:50]}...")
+    return engine
 
 
 @functools.cache
@@ -37,5 +44,9 @@ def get_engine() -> AsyncEngine:
     Returns:
         Cached AsyncEngine instance
     """
+    logger.info("Retrieving cached async engine")
     settings = get_business_settings()
-    return create_async_engine(str(settings.pg_url))
+    logger.debug("Creating engine from settings")
+    engine = create_async_engine(str(settings.pg_url))
+    logger.info("Cached async engine retrieved successfully")
+    return engine

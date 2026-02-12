@@ -12,6 +12,7 @@ The business_backend is responsible for:
 """
 
 import functools
+import logging
 from collections.abc import Iterable
 from typing import Any, Optional
 
@@ -22,6 +23,9 @@ from database.session import get_session_factory
 from llm.provider import LLMProvider, create_llm_provider
 from services.product_service import ProductService
 from services.search_service import SearchService
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 
@@ -33,7 +37,10 @@ async def create_session_factory() -> async_sessionmaker[AsyncSession]:
     Returns:
         async_sessionmaker for creating database sessions
     """
-    return get_session_factory()
+    logger.debug("Creating database session factory")
+    factory = get_session_factory()
+    logger.info("Database session factory created successfully")
+    return factory
 
 
 async def create_product_service(
@@ -48,7 +55,10 @@ async def create_product_service(
     Returns:
         ProductService instance
     """
-    return ProductService(session_factory)
+    logger.debug("Creating ProductService instance")
+    service = ProductService(session_factory)
+    logger.info("ProductService instance created successfully")
+    return service
 
 
 async def create_llm_provider_instance() -> LLMProvider:
@@ -58,7 +68,13 @@ async def create_llm_provider_instance() -> LLMProvider:
     Returns:
         LLMProvider instance or None if disabled
     """
-    return create_llm_provider()
+    logger.debug("Creating LLM provider instance")
+    provider = create_llm_provider()
+    if provider:
+        logger.info("LLM provider instance created successfully")
+    else:
+        logger.warning("LLM provider is disabled or not configured")
+    return provider
 
 
 async def create_search_service(
@@ -75,12 +91,15 @@ async def create_search_service(
     Returns:
         SearchService instance
     """
-    return SearchService(llm_provider, product_service)
+    logger.debug("Creating SearchService instance")
+    service = SearchService(llm_provider, product_service)
+    logger.info("SearchService instance created successfully")
+    return service
 
 
 def providers() -> Iterable[aioinject.Provider[Any]]:
     """
-    Create and return all dependency injection providers for 
+    Create and return all dependency injection providers.
 
     Includes:
     - TenantDataService: Reads tenant data from CSV files
@@ -88,16 +107,18 @@ def providers() -> Iterable[aioinject.Provider[Any]]:
     - LLMProvider: OpenAI via LangChain (optional)
     - SearchService: Semantic search with LLM
     """
+    logger.debug("Creating dependency injection providers")
     providers_list: list[aioinject.Provider[Any]] = []
 
-    # Database
+    logger.debug("Registering database providers")
     providers_list.append(aioinject.Singleton(create_session_factory))
     providers_list.append(aioinject.Singleton(create_product_service))
 
-    # LLM (optional - can return None)
+    logger.debug("Registering LLM and search providers")
     providers_list.append(aioinject.Singleton(create_llm_provider_instance))
     providers_list.append(aioinject.Singleton(create_search_service))
 
+    logger.info(f"Dependency injection providers created successfully - total: {len(providers_list)}")
     return providers_list
 
 
@@ -111,7 +132,13 @@ def create_business_container() -> aioinject.Container:
     Returns:
         Configured aioinject.Container instance
     """
+    logger.info("Creating business backend dependency injection container")
     container = aioinject.Container()
-    for provider in providers():
+    
+    logger.debug("Registering providers in container")
+    for idx, provider in enumerate(providers(), 1):
         container.register(provider)
+        logger.debug(f"Registered provider {idx}")
+    
+    logger.info("Business backend container created and configured successfully")
     return container

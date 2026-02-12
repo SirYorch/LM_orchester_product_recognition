@@ -128,5 +128,22 @@ class InferenceService:
         Returns:
             Health status dict
         """
-        # Here your code for health check
-        pass
+        logger.debug(f"Running health check for model: {model_name}")
+        try:
+            model = self.registry.get_model(model_name)
+            if model is None:
+                logger.warning(f"Health check failed - Model not found: {model_name}")
+                return {"status": "not_found", "healthy": False, "model_name": model_name}
+            
+            is_loaded = model.is_loaded
+            health_status = {
+                "model_name": model_name,
+                "status": "healthy" if is_loaded else "not_ready",
+                "healthy": is_loaded,
+                "loaded": is_loaded
+            }
+            logger.info(f"Health check completed for model {model_name}: {health_status['status']}")
+            return health_status
+        except Exception as e:
+            logger.error(f"Health check failed for model {model_name}: {str(e)}")
+            return {"model_name": model_name, "status": "error", "healthy": False, "error": str(e)}
