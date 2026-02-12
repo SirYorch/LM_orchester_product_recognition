@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import logging
 
 import strawberry
 
@@ -22,21 +23,25 @@ import uvicorn
 from aioinject.ext.strawberry import AioInjectExtension
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from loguru import logger
 from strawberry.fastapi import GraphQLRouter
 
 from api.graphql.queries import BusinessQuery
 from api.rest.routes2 import router as product_router
 from container import create_business_container
+from logging_config import configure_logging
+
+logger = configure_logging(logging.INFO)
 
 
 def create_business_backend_app() -> FastAPI:
     """
-    Create independent FastAPI application for 
+    Create independent FastAPI application for Business Backend.
 
     Returns:
         FastAPI application with GraphQL endpoint
     """
+    logger.info("Creating Business Backend FastAPI application")
+    
     app = FastAPI(
         title="Business Backend API",
         description="Provides FAQs and Documents from CSV files via GraphQL",
@@ -45,42 +50,42 @@ def create_business_backend_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # Configure CORS
+    logger.info("Configuring CORS middleware")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Allows all origins
+        allow_origins=["*"],
         allow_credentials=True,
-        allow_methods=["*"],  # Allows all methods
-        allow_headers=["*"],  # Allows all headers
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
-    # Create business_backend's own DI container
+    logger.info("Creating Business Backend DI container")
     container = create_business_container()
-    logger.info("✅ Business Backend DI container created")
+    logger.info("Business Backend DI container created successfully")
 
-    # Create GraphQL schema with BusinessQuery as root
+    logger.info("Creating GraphQL schema")
     schema = strawberry.Schema(
         query=BusinessQuery,
         extensions=[
-            AioInjectExtension(container),  # Uses business_backend's container
+            AioInjectExtension(container),
         ],
     )
-    logger.info("✅ Business Backend GraphQL schema created")
+    logger.info("Business Backend GraphQL schema created successfully")
 
-    # Add GraphQL router
+    logger.info("Registering GraphQL router")
     graphql_app = GraphQLRouter(
         schema,
-        graphiql=True,  # Enable GraphiQL interface
+        graphiql=True,
     )
     app.include_router(graphql_app, prefix="/graphql")
 
-    # Register Product Recognition Router (from routes2.py)
+    logger.info("Registering product recognition router")
     app.include_router(product_router)
 
-    # Health check endpoint
     @app.get("/health")
     async def health():
         """Health check for business backend service."""
+        logger.debug("Health check endpoint called")
         return {
             "status": "ok",
             "service": "business_backend",
@@ -90,6 +95,7 @@ def create_business_backend_app() -> FastAPI:
     @app.get("/")
     async def root():
         """Root endpoint with service information."""
+        logger.debug("Root endpoint called")
         return {
             "service": "Business Backend API",
             "version": "1.0.0",
@@ -100,7 +106,7 @@ def create_business_backend_app() -> FastAPI:
             "docs": "/docs",
         }
 
-    logger.info("✅ Business Backend FastAPI app created")
+    logger.info("Business Backend FastAPI app created successfully")
     return app
 
 
@@ -120,16 +126,16 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    logger.info("Command line arguments parsed successfully")
 
     app = create_business_backend_app()
 
-    # Extract args with explicit types
     host: str = args.host
     port: int = args.port
 
-    logger.info(f"🚀 Starting Business Backend on {host}:{port}")
-    logger.info(f"📊 GraphiQL UI: http://localhost:{port}/graphql")
-    logger.info(f"📖 API Docs: http://localhost:{port}/docs")
+    logger.info(f"Starting Business Backend on {host}:{port}")
+    logger.info(f"GraphiQL UI available at http://localhost:{port}/graphql")
+    logger.info(f"API documentation available at http://localhost:{port}/docs")
 
     uvicorn.run(
         app,

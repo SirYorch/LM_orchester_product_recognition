@@ -4,10 +4,10 @@ Search Service for Business Backend.
 Orchestrates LLM with product search tool for semantic queries.
 """
 
+import logging
 from dataclasses import dataclass
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from loguru import logger
 
 from database.models import ProductStock
 from llm.provider import LLMProvider
@@ -16,6 +16,9 @@ from llm.tools.product_search_tool import (
     create_product_search_tool,
 )
 from services.product_service import ProductService
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -56,12 +59,19 @@ Respond in the same language as the user's query."""
             llm_provider: LLM provider (can be None if disabled)
             product_service: ProductService for database queries
         """
+        logger.debug("Initializing SearchService")
         self.llm_provider = llm_provider
         self.product_service = product_service
         self.search_tool: ProductSearchTool | None = None
 
         if llm_provider is not None:
+            logger.debug("LLM provider configured, creating product search tool")
             self.search_tool = create_product_search_tool(product_service)
+            logger.debug("Product search tool created successfully")
+        else:
+            logger.warning("LLM provider not configured, search will use fallback mode")
+        
+        logger.debug("SearchService initialized successfully")
 
     async def semantic_search(self, query: str) -> SearchResult:
         """
@@ -73,44 +83,46 @@ Respond in the same language as the user's query."""
         Returns:
             SearchResult with answer and found products
         """
+        logger.info(f"Starting semantic search for query: '{query}'")
         if self.llm_provider is None or self.search_tool is None:
-            # Fallback: direct search without LLM
             logger.warning("LLM not configured, using fallback search")
             return await self._fallback_search(query)
 
         try:
-            return await self._llm_search(query)
+            logger.debug("Attempting LLM search with tool calling")
+            result = await self._llm_search(query)
+            logger.info(f"LLM search completed successfully, found {len(result.products_found)} products")
+            return result
         except Exception as e:
-            logger.error(f"LLM search failed: {e}")
+            logger.error(f"LLM search failed: {str(e)}, falling back to direct search")
             return await self._fallback_search(query)
 
     async def _llm_search(self, query: str) -> SearchResult:
         """Perform search using LLM with tool calling."""
+        logger.debug("Entering LLM search mode")
         assert self.llm_provider is not None
         assert self.search_tool is not None
 
-        # Bind tool to model
+        logger.debug("Binding tools to LLM model")
         model_with_tools = self.llm_provider.bind_tools([self.search_tool])
 
-        # Create messages
+        logger.debug("Creating messages for LLM")
         messages = [
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {"role": "user", "content": query},
         ]
 
-        # First LLM call - may request tool use
+        logger.debug("First LLM invocation")
         response = await model_with_tools.ainvoke(messages)
 
-        # Check if tool was called
         if hasattr(response, "tool_calls") and response.tool_calls:
-            # Execute tool calls
+            logger.info(f"LLM requested tool calls, executing {len(response.tool_calls)} tool(s)")
             tool_messages = []
             for tool_call in response.tool_calls:
                 if tool_call["name"] == "product_search":
-                    # Execute the search
-                    tool_result = await self.search_tool._arun(
-                        tool_call["args"]["search_term"]
-                    )
+                    search_term = tool_call["args"]["search_term"]
+                    logger.debug(f"Executing product_search tool with term: '{search_term}'")
+                    tool_result = await self.search_tool._arun(search_term)
                     tool_messages.append(
                         ToolMessage(
                             content=tool_result,
@@ -118,12 +130,12 @@ Respond in the same language as the user's query."""
                         )
                     )
 
-            # Second LLM call with tool results
+            logger.debug("Second LLM invocation with tool results")
             messages_with_tools = [
                 {"role": "system", "content": self.SYSTEM_PROMPT},
                 {"role": "user", "content": query},
-                response,  # AI message with tool calls
-                *tool_messages,  # Tool results
+                response,
+                *tool_messages,
             ]
 
             final_response = await model_with_tools.ainvoke(messages_with_tools)
@@ -133,18 +145,20 @@ Respond in the same language as the user's query."""
                 else str(final_response.content)
             )
         else:
-            # No tool call, use direct response
+            logger.debug("LLM did not request tool calls, using direct response")
             answer = (
                 response.content
                 if isinstance(response.content, str)
                 else str(response.content)
             )
 
-        return SearchResult(
+        result = SearchResult(
             answer=answer,
             products_found=self.search_tool.get_last_results(),
             query=query,
         )
+        logger.debug("LLM search completed")
+        return result
 
     async def _fallback_search(self, query: str) -> SearchResult:
         """
@@ -152,23 +166,25 @@ Respond in the same language as the user's query."""
 
         Extracts keywords from query and searches directly.
         """
-        # Simple keyword extraction (just use the query as search term)
-        # In production, you might want more sophisticated NLP
+        logger.debug("Entering fallback search mode")
         search_term = query.strip()
 
-        # Remove common question words
+        logger.debug(f"Extracting search term from query: '{query}'")
         for word in ["tienen", "hay", "existe", "buscar", "quiero", "stock", "?", "¿"]:
             search_term = search_term.lower().replace(word, "")
         search_term = search_term.strip()
 
         if not search_term:
+            logger.warning("No search term extracted from query")
             return SearchResult(
                 answer="Por favor, especifica el producto que buscas.",
                 products_found=[],
                 query=query,
             )
 
+        logger.debug(f"Performing direct search with term: '{search_term}'")
         products = await self.product_service.search_by_name(search_term, limit=10)
+        logger.info(f"Fallback search found {len(products)} product(s) for term '{search_term}'")
 
         if not products:
             answer = f"No encontré productos que coincidan con '{search_term}'."

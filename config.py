@@ -4,9 +4,13 @@ Configuration settings for the Business Backend application.
 Uses Pydantic for settings management with environment variable support.
 """
 
+import logging
 from pydantic import Field
 from pydantic.networks import PostgresDsn
 from pydantic_settings import BaseSettings
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class BusinessSettings(BaseSettings):
@@ -44,4 +48,7 @@ def get_business_settings() -> BusinessSettings:
     Returns:
         BusinessSettings: Configured settings object
     """
-    return BusinessSettings()
+    logger.debug("Loading business settings from environment")
+    settings = BusinessSettings()
+    logger.info(f"Business settings loaded - Host: {settings.host}, Port: {settings.port}, Debug: {settings.debug}")
+    return settings
